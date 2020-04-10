@@ -8,10 +8,10 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf8')
 
 class Formatter:
     # control sequences
-    ctrl_1line = r'(^|\s*)(if|while|for)([\s\(]+\S.*)(end|endif|endwhile|endfor)(\s*$)'
-    ctrlstart = r'(^|\s*)(function|if|while|for|parfor|try|classdef|methods|properties|events)([\s\(]+\S.*|\s*$)'
-    ctrlstart_2 = r'(^|\s*)(switch)([\s\(]+\S.*|\s*$)'
-    ctrlcont = r'(^|\s*)(elseif|else|case|otherwise|catch)([\s\(]+\S.*|\s*$)'
+    ctrl_1line = r'(^|\s*)(if|while|for)(\W\S.*\W)(end|endif|endwhile|endfor)(\s*$)'
+    ctrlstart = r'(^|\s*)(function|if|while|for|parfor|try|classdef|methods|properties|events)(\W\S.*|\s*$)'
+    ctrlstart_2 = r'(^|\s*)(switch)(\W\S.*|\s*$)'
+    ctrlcont = r'(^|\s*)(elseif|else|case|otherwise|catch)(\W\S.*|\s*$)'
     ctrlend = r'(^|\s*)(end|endfunction|endif|endwhile|endfor|endswitch)(\s+\S.*|\s*$)'
     matrixstart = r'(^|\s*)(\S.*)(\[[^\]]*)(\s*$)'
     matrixend = r'(^|\s*)(.*)(\].*)(\s*$)'
@@ -34,6 +34,11 @@ class Formatter:
 
     # divide string into three parts by extracting and formatting certain expressions
     def extract(self, part):
+        # important space
+        m = re.match(r"(.*[\)\}\]\'\w])(\s+)([\(\[\{\'%\w].*)", part)
+        if m:
+            return (m.group(1), m.group(2), m.group(3))
+
         # string
         m = re.match(r'(^|.*[\(\[\{,;=\+\-\s])\s*(\'([^\']|\'\')+\')\s*([\)\}\]\+\-,;].*|\s.*|$)', part)
         if m:
@@ -48,11 +53,6 @@ class Formatter:
             self.iscomment=1
             return (m.group(1), m.group(2), '')
 
-        # non-comma-separated vector
-        m = re.match(r'(^|.*)\s*(\[[^\],;]*\])\s*(.*|\s.*|$)', part)
-        if m:
-            return (m.group(1), m.group(2), m.group(3))
-
         # decimal number (e.g. 5.6E-3)
         m = re.match(r'(^|.*\W)\s*(\d+\.?\d*)([eE][+-]?)(\d+)\s*(\S.*|$)', part)
         if m:
@@ -64,7 +64,7 @@ class Formatter:
             return (m.group(1) + m.group(2), m.group(3), m.group(4) + m.group(5))
 
         # signum (unary - or +)
-        m = re.match(r'(^|.*[\(\[\{,;:=\*/])\s*(\+|\-)\s*(\S.*)', part)
+        m = re.match(r'(^|.*[\(\[\{,;:=\*/ ])\s*(\+|\-)(\S.*)', part)
         if m:
             return (m.group(1), m.group(2), m.group(3))
 
@@ -228,8 +228,14 @@ class Formatter:
         # read lines from file
         wlines = rlines = []
         # with open(filename, 'r', encoding=encoding) as f:
-        with open(filename, 'r', encoding='UTF-8') as f:
-            rlines = f.readlines()[start-1:end]
+
+        if filename == '-':
+            with sys.stdin as f:
+                rlines = f.readlines()[start-1:end]
+        else:
+            # with open(filename, 'r') as f:
+            with open(filename, 'r', encoding='UTF-8') as f:
+                rlines = f.readlines()[start-1:end]
 
         # get initial indent lvl
         p = r'(\s*)(.*)'
